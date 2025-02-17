@@ -1,7 +1,7 @@
 import sqlite3
 import os
-from telegram import Update, InputMediaAudio
-from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, CallbackQueryHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
 import logging
 
 # Set up logging
@@ -26,12 +26,15 @@ def init_db():
     CREATE TABLE IF NOT EXISTS user_channels (
         user_id INTEGER PRIMARY KEY,
         channels TEXT
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS music_files (
-                    channel_id TEXT,
-                    file_name TEXT,
-                    file_id TEXT
-                )''')
+    )
+    ''')
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS music_files (
+        channel_id INTEGER,
+        file_name TEXT,
+        file_id TEXT
+    )
+    ''')
     conn.commit()
     conn.close()
 
@@ -60,14 +63,26 @@ def get_channels(user_id):
     conn.close()
     return result[0].split(',') if result else []
 
-# Save music file details to the database
+# Function to save music files in the database
 def save_music_file(channel_id, file_name, file_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('INSERT INTO music_files (channel_id, file_name, file_id) VALUES (?, ?, ?)', 
+    c.execute('INSERT INTO music_files (channel_id, file_name, file_id) VALUES (?, ?, ?)',
               (channel_id, file_name, file_id))
     conn.commit()
     conn.close()
+
+# Function to handle new music file uploads
+async def handle_new_file(update: Update, context: CallbackContext):
+    if update.message.document or update.message.audio:
+        file_name = update.message.document.file_name if update.message.document else update.message.audio.file_name
+        file_id = update.message.document.file_id if update.message.document else update.message.audio.file_id
+        channel_id = update.message.chat.id
+
+        # Save the file info in the database
+        save_music_file(channel_id, file_name, file_id)
+
+        await update.message.reply_text(f"File '{file_name}' saved successfully!")
 
 # Function to handle the start command
 async def start(update: Update, context: CallbackContext):
@@ -97,7 +112,7 @@ async def search_music(update: Update, context: CallbackContext):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT channel_id, file_name, file_id FROM music_files WHERE file_name LIKE ?", 
-              (f"%{query}%",))
+              (f"%{query}%",))  # Search using LIKE operator for partial matches
     results = c.fetchall()
     conn.close()
     
@@ -109,45 +124,32 @@ async def search_music(update: Update, context: CallbackContext):
         await update.message.reply_text(f"No music found for: {query}.")
 
 # Function to handle song selection
-async def button(update: Update, context: CallbackContext):
+async def handle_selection(update: Update, context: CallbackContext):
     query = update.callback_query
-    song_file_id = query.data.split('_')[1]
-    
-    # Retrieve and send the selected song
+    file_id = query.data.split('_')[1]
+
+    # Retrieve the file information from the database
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT file_id FROM music_files WHERE file_id = ?", (song_file_id,))
+    c.execute("SELECT file_id, file_name FROM music_files WHERE file_id = ?", (file_id,))
     result = c.fetchone()
     conn.close()
-    
+
     if result:
-        file_id = result[0]
-        await query.answer()
-        await query.edit_message_text(f"Sending the selected song: {file_id}...")
-        await query.message.reply_audio(file_id)
+        file_id, file_name = result
+        # Send the file to the user
+        await query.message.reply_text(f"Sending file {file_name}...")
+        await query.message.reply_document(file_id)
     else:
-        await query.answer()
-        await query.edit_message_text("Sorry, the song is no longer available.")
-
-# Function to handle new music file uploads
-async def handle_new_file(update: Update, context: CallbackContext):
-    if update.message.document or update.message.audio:
-        file_name = update.message.document.file_name if update.message.document else update.message.audio.file_name
-        file_id = update.message.document.file_id if update.message.document else update.message.audio.file_id
-        channel_id = update.message.chat.id
-        
-        # Save the file info in the database
-        save_music_file(channel_id, file_name, file_id)
-
-        await update.message.reply_text(f"File '{file_name}' saved successfully!")
+        await query.message.reply_text("Sorry, this file is no longer available.")
 
 # Add the command handlers
 application.add_handler(CommandHandler('start', start))
 application.add_handler(CommandHandler('add_channel', add_channel_command))
 application.add_handler(CommandHandler('search_music', search_music))
-application.add_handler(CallbackQueryHandler(button))  # Handle song selection button
 application.add_handler(MessageHandler(filters.Document.ALL, handle_new_file))  # Listen for document uploads (e.g., MP3)
-application.add_handler(MessageHandler(filters.AUDIO, handle_new_file))  # Listen for audio uploads (e.g., MP3)
+application.add_handler(MessageHandler(filters.Audio.ALL, handle_new_file))  # Listen for audio uploads
+application.add_handler(CallbackQueryHandler(handle_selection))  # Handle song selection
 
 # Initialize the database
 init_db()
