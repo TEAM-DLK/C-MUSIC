@@ -1,8 +1,9 @@
-import sqlite3
 import os
+import sqlite3
+import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext
-import logging
+from telegram.ext import MessageHandler, filters
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -56,6 +57,12 @@ def get_channels(user_id):
     conn.close()
     return result[0].split(',') if result else []
 
+# Function to simulate a song search (to be replaced with actual music search API)
+def search_song(query):
+    # Simulating song search by returning a mock URL for the found song
+    song_name = query.replace(' ', '_').lower()  # Format the song name
+    return f"https://example.com/music/{song_name}.mp3"
+
 # Function to handle the start command
 async def start(update: Update, context: CallbackContext):
     await update.message.reply_text("Welcome! Use /add_channel <channel_username> to add your channel. Then use /search_music <song_name> to find music in your channels.")
@@ -71,13 +78,13 @@ async def add_channel_command(update: Update, context: CallbackContext):
     add_channel(user.id, channel)
     await update.message.reply_text(f"Channel {channel} added to your account. Please add the bot as an admin in your channel.")
 
-# Function to handle the music search
+# Function to handle searching for music and sending it
 async def search_music(update: Update, context: CallbackContext):
     user = update.message.from_user
     query = ' '.join(context.args)
     
     if not query:
-        await update.message.reply_text("Please provide a search term (e.g., /search_music song_name).")
+        await update.message.reply_text("Please provide the name of the song.")
         return
     
     channels = get_channels(user.id)  # Get the channels the user has added
@@ -88,14 +95,14 @@ async def search_music(update: Update, context: CallbackContext):
     found = False
     for channel in channels:
         try:
-            # Here, you would implement the code to search through the channel for music
-            # Since the Bot API doesn't allow full chat history access, you need a way to access that
-            # For now, we'll simulate finding a music file and sending it back to the user
-            
-            # Simulating a music file found
-            await update.message.reply_text(f"Found music in {channel}: '{query}'")
-            found = True
-            break
+            # Simulate the song search from the channel
+            song_url = search_song(query)
+            if song_url:
+                # Send the song as an audio file (mock URL here)
+                await update.message.reply_text(f"Found the song in {channel}: {query}. Sending it now...")
+                await update.message.reply_audio(song_url)
+                found = True
+                break
         except Exception as e:
             await update.message.reply_text(f"Error while searching in {channel}: {e}")
     
