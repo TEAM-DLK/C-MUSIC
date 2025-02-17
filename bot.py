@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackContext
 import logging
 
 # Set up logging
@@ -12,9 +12,8 @@ logger = logging.getLogger(__name__)
 # Bot token - it will be set as an environment variable in Heroku
 TOKEN = os.getenv('BOT_TOKEN')
 
-# Initialize the bot
-updater = Updater(TOKEN, use_context=True)
-dispatcher = updater.dispatcher
+# Initialize the application (for v20+)
+application = Application.builder().token(TOKEN).build()
 
 # Database file
 DB_FILE = 'bot_db.db'
@@ -58,32 +57,32 @@ def get_channels(user_id):
     return result[0].split(',') if result else []
 
 # Function to handle the start command
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Welcome! Use /add_channel <channel_username> to add your channel. Then use /search_music <song_name> to find music in your channels.")
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text("Welcome! Use /add_channel <channel_username> to add your channel. Then use /search_music <song_name> to find music in your channels.")
 
 # Function to handle adding a channel
-def add_channel_command(update: Update, context: CallbackContext):
+async def add_channel_command(update: Update, context: CallbackContext):
     user = update.message.from_user
     if not context.args:
-        update.message.reply_text("Please provide the channel username (e.g., /add_channel @mychannel).")
+        await update.message.reply_text("Please provide the channel username (e.g., /add_channel @mychannel).")
         return
 
     channel = context.args[0]
     add_channel(user.id, channel)
-    update.message.reply_text(f"Channel {channel} added to your account. Please add the bot as an admin in your channel.")
+    await update.message.reply_text(f"Channel {channel} added to your account. Please add the bot as an admin in your channel.")
 
 # Function to handle the music search
-def search_music(update: Update, context: CallbackContext):
+async def search_music(update: Update, context: CallbackContext):
     user = update.message.from_user
     query = ' '.join(context.args)
     
     if not query:
-        update.message.reply_text("Please provide a search term (e.g., /search_music song_name).")
+        await update.message.reply_text("Please provide a search term (e.g., /search_music song_name).")
         return
     
     channels = get_channels(user.id)  # Get the channels the user has added
     if not channels:
-        update.message.reply_text("You have not added any channels. Use /add_channel <channel_username> to add a channel.")
+        await update.message.reply_text("You have not added any channels. Use /add_channel <channel_username> to add a channel.")
         return
     
     found = False
@@ -94,23 +93,22 @@ def search_music(update: Update, context: CallbackContext):
             # For now, we'll simulate finding a music file and sending it back to the user
             
             # Simulating a music file found
-            update.message.reply_text(f"Found music in {channel}: '{query}'")
+            await update.message.reply_text(f"Found music in {channel}: '{query}'")
             found = True
             break
         except Exception as e:
-            update.message.reply_text(f"Error while searching in {channel}: {e}")
+            await update.message.reply_text(f"Error while searching in {channel}: {e}")
     
     if not found:
-        update.message.reply_text(f"No music found for: {query} in your channels.")
+        await update.message.reply_text(f"No music found for: {query} in your channels.")
 
-# Command handlers
-dispatcher.add_handler(CommandHandler('start', start))
-dispatcher.add_handler(CommandHandler('add_channel', add_channel_command))
-dispatcher.add_handler(CommandHandler('search_music', search_music))
+# Add the command handlers
+application.add_handler(CommandHandler('start', start))
+application.add_handler(CommandHandler('add_channel', add_channel_command))
+application.add_handler(CommandHandler('search_music', search_music))
 
 # Initialize the database
 init_db()
 
 # Start the bot
-updater.start_polling()
-updater.idle()
+application.run_polling()
