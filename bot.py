@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext
 from telegram.ext import MessageHandler, filters
 
@@ -57,11 +57,14 @@ def get_channels(user_id):
     conn.close()
     return result[0].split(',') if result else []
 
-# Function to simulate a song search (to be replaced with actual music search API)
-def search_song(query):
-    # Simulating song search by returning a mock URL for the found song
-    song_name = query.replace(' ', '_').lower()  # Format the song name
-    return f"https://example.com/music/{song_name}.mp3"
+# Function to simulate listing music files from a channel (you should replace this with actual logic)
+def list_music_files(channel):
+    # This simulates a list of music files in the channel
+    return [
+        {"title": "Song 1", "file_id": "song_1_file_id"},
+        {"title": "Song 2", "file_id": "song_2_file_id"},
+        {"title": "Song 3", "file_id": "song_3_file_id"}
+    ]
 
 # Function to handle the start command
 async def start(update: Update, context: CallbackContext):
@@ -78,7 +81,7 @@ async def add_channel_command(update: Update, context: CallbackContext):
     add_channel(user.id, channel)
     await update.message.reply_text(f"Channel {channel} added to your account. Please add the bot as an admin in your channel.")
 
-# Function to handle searching for music and sending it
+# Function to handle music search and sending the music file
 async def search_music(update: Update, context: CallbackContext):
     user = update.message.from_user
     query = ' '.join(context.args)
@@ -95,12 +98,19 @@ async def search_music(update: Update, context: CallbackContext):
     found = False
     for channel in channels:
         try:
-            # Simulate the song search from the channel
-            song_url = search_song(query)
-            if song_url:
-                # Send the song as an audio file (mock URL here)
-                await update.message.reply_text(f"Found the song in {channel}: {query}. Sending it now...")
-                await update.message.reply_audio(song_url)
+            # Simulate getting the list of music files from the channel
+            music_files = list_music_files(channel)
+            
+            # Search for the song in the music files
+            matched_files = [file for file in music_files if query.lower() in file["title"].lower()]
+            
+            if matched_files:
+                # Create an inline keyboard for the user to choose a song
+                keyboard = [
+                    [InlineKeyboardButton(f"Select {file['title']}", callback_data=file['file_id'])] for file in matched_files
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(f"Found music in {channel}: {query}. Please choose a song:", reply_markup=reply_markup)
                 found = True
                 break
         except Exception as e:
@@ -109,10 +119,24 @@ async def search_music(update: Update, context: CallbackContext):
     if not found:
         await update.message.reply_text(f"No music found for: {query} in your channels.")
 
+# Function to handle song selection
+async def button(update: Update, context: CallbackContext):
+    query = update.callback_query
+    song_file_id = query.data
+    
+    # Simulate sending the selected song file
+    await query.answer()
+    await query.edit_message_text(f"Sending the selected song: {song_file_id}...")
+    
+    # In a real scenario, you would retrieve the file ID and send it
+    await query.message.reply_audio(song_file_id)
+
 # Add the command handlers
 application.add_handler(CommandHandler('start', start))
 application.add_handler(CommandHandler('add_channel', add_channel_command))
 application.add_handler(CommandHandler('search_music', search_music))
+application.add_handler(MessageHandler(filters.Regex('^/search_music'), search_music))  # For music search in response
+application.add_handler(CallbackQueryHandler(button))  # Handle song selection button
 
 # Initialize the database
 init_db()
