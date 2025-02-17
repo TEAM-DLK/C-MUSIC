@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from telegram import Update, InputMediaAudio
-from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, CallbackQueryHandler
 import logging
 
 # Set up logging
