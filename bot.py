@@ -3,7 +3,7 @@ import sqlite3
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext
-from telegram.ext import MessageHandler, filters
+from telegram.ext import MessageHandler, filters, CallbackQueryHandler  # Add the missing import
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
