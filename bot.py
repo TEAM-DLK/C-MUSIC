@@ -146,8 +146,8 @@ application.add_handler(CommandHandler('start', start))
 application.add_handler(CommandHandler('add_channel', add_channel_command))
 application.add_handler(CommandHandler('search_music', search_music))
 application.add_handler(CallbackQueryHandler(button))  # Handle song selection button
-application.add_handler(MessageHandler(filters.Document.ALL, handle_new_file))  # Listen for file uploads
-application.add_handler(MessageHandler(filters.Audio.ALL, handle_new_file))  # Listen for audio uploads
+application.add_handler(MessageHandler(filters.DOCUMENTS, handle_new_file))  # Listen for document uploads (e.g., MP3)
+application.add_handler(MessageHandler(filters.AUDIO, handle_new_file))  # Listen for audio uploads (e.g., MP3)
 
 # Initialize the database
 init_db()
